@@ -91,6 +91,8 @@
 .mapViewport { position: relative; min-height: clamp(510px, calc(100dvh - 235px), 760px); overflow: hidden; background: var(--ocean); touch-action: pan-y; }
 .mapInteractionActive { touch-action: none; }
 .mapToolbar { position: absolute; top: 13px; right: 13px; z-index: 8; display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-solid) 80%, transparent); box-shadow: 0 8px 22px rgba(0,0,0,.12); backdrop-filter: blur(15px); }
+.mapCenterBadge { position: absolute; top: 13px; left: 13px; z-index: 8; display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-solid) 80%, transparent); box-shadow: 0 8px 22px rgba(0,0,0,.1); color: var(--accent); font-size: 8px; font-weight: 800; backdrop-filter: blur(15px); }
+.mapCenterBadge small { color: var(--muted); font-size: 6px; font-weight: 800; letter-spacing: .12em; }
 .mapToolbar button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--text-soft); cursor: pointer; }
 .mapToolbar button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
 .mobileMapToggle { display: none; }
@@ -272,6 +274,8 @@
   .mapViewport, .mapSvg { min-height: 390px; }
   .mapToolbar { top: 50px; right: 9px; flex-direction: column; }
   .mobileMapToggle { position: absolute; top: 9px; right: 9px; z-index: 9; display: inline-flex; min-height: 35px; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--surface-solid) 88%, transparent); color: var(--text-soft); font-size: 8px; font-weight: 700; }
+  .mapCenterBadge { top: 9px; left: 9px; min-height: 35px; }
+  .mapCenterBadge small { display: none; }
   .mobileMapToggle[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
   .mapLegend { right: 9px; bottom: 9px; left: 9px; justify-content: center; gap: 8px; overflow-x: auto; }
   .mapLegend span:first-child { display: none; }

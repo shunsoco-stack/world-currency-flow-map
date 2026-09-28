@@ -1,13 +1,14 @@
 "use client";
 
-import { geoNaturalEarth1, geoPath } from "d3-geo";
-import { Minus, Move, Plus, RotateCcw } from "lucide-react";
+import { geoPath } from "d3-geo";
+import { MapPin, Minus, Move, Plus, RotateCcw } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import countriesTopology from "world-atlas/countries-110m.json";
 
 import { CURRENCY_META } from "@/lib/market-data/config";
+import { createJapanCenteredProjection } from "@/lib/map-projection";
 import type { CurrencyCode, CurrencyFlow, CurrencyStrength } from "@/lib/market-data/types";
 import styles from "./currency-flow-app.module.css";
 
@@ -40,7 +41,7 @@ export function WorldMap({
   const [mobileMapActive, setMobileMapActive] = useState(false);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
 
-  const projection = useMemo(() => geoNaturalEarth1().scale(156).translate([WIDTH / 2, HEIGHT / 2 + 10]), []);
+  const projection = useMemo(() => createJapanCenteredProjection(WIDTH, HEIGHT), []);
   const countries = useMemo(() => {
     const topology = countriesTopology as unknown as Topology<{ countries: GeometryCollection }>;
     return feature(topology, topology.objects.countries);
@@ -103,6 +104,7 @@ export function WorldMap({
 
   return (
     <div className={`${styles.mapViewport} ${mobileMapActive ? styles.mapInteractionActive : ""}`}>
+      <div className={styles.mapCenterBadge}><MapPin size={13} /><span>日本中心</span><small>JAPAN CENTERED</small></div>
       <div className={styles.mapToolbar} aria-label="地図操作">
         <button type="button" onClick={() => zoom(transform.scale + 0.3)} aria-label="拡大"><Plus size={17} /></button>
         <button type="button" onClick={() => zoom(transform.scale - 0.3)} aria-label="縮小"><Minus size={17} /></button>
@@ -122,7 +124,7 @@ export function WorldMap({
         className={styles.mapSvg}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label="主要8通貨の相対的な強弱フローを示す世界地図"
+        aria-label="日本を中心に主要8通貨の相対的な強弱フローを示す世界地図"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

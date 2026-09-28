@@ -15,7 +15,7 @@
 
 ## Concept
 
-- 実際の国境を使った世界地図を主役にする
+- 実際の国境を使い、日本を中央に置いた世界地図を主役にする
 - 変化率の符号から、必ず「弱い通貨 → 強い通貨」を決定する
 - Arrowの太さと速度を値動きの大きさに連動させる
 - 色だけに依存せず、通貨コード・数値・`↑ / ↓`を併記する
@@ -109,6 +109,7 @@ Filter / Pair Detail / Ranking / Historical Playback
 
 - `world-atlas`のNatural Earth由来110m TopoJSONを`topojson-client`で変換
 - `d3-geo`のNatural Earth projectionで実世界の国境を描画
+- 日本の経度（139.7°E）を中央にした投影で、欧州を左、北米を右に配置
 - 8 Currency Node、最大11 Flow、最大8 animated particleに制限
 - Zoom、Pan、Reset、Arrow選択、Currency Filter、JPY Focus
 - Tab非表示、ユーザーPause、`prefers-reduced-motion`でAnimationを停止
@@ -168,7 +169,7 @@ npm run build
 npm run screenshots -- https://world-currency-flow-map.vercel.app
 ```
 
-VitestではUSD/JPYの正負方向、ECB CSV / cross-rate、Percentage Change、Strength、Arrow Threshold、Ranking、6 Timeframe、Currency Filter、3 Demo Scenario、Stale、Market Closed、API Error fallback、Reduced Motionを検証します。PlaywrightではProductionの5画面を操作・撮影し、Desktop / Tablet / Landscape Mobile / Portrait Mobileの横溢れ、Mobile map gesture、Console / Page / Request errorを検査します。
+Vitestでは日本中心投影、USD/JPYの正負方向、ECB CSV / cross-rate、Percentage Change、Strength、Arrow Threshold、Ranking、6 Timeframe、Currency Filter、3 Demo Scenario、Stale、Market Closed、API Error fallback、Reduced Motionを検証します。PlaywrightではProductionの5画面を操作・撮影し、Desktop / Tablet / Landscape Mobile / Portrait Mobileの横溢れ、Mobile map gesture、Console / Page / Request errorを検査します。
 
 ## Deployment
 

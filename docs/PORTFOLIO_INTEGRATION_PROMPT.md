@@ -26,7 +26,7 @@
 
 説明には、実装を確認できた次の内容だけを含めてください。
 
-- Natural Earth由来の実地理データを使ったInteractive World Map
+- Natural Earth由来の実地理データを使い、日本を中央に配置したInteractive World Map
 - USD / JPY / EUR / GBP / CHF / AUD / CAD / NZDの8 Currency Node
 - 11 Currency Pairの変化率から決定論的に算出するCurrency Strength
 - 「弱い通貨 → 強い通貨」へ流れるAnimated Arrow
@@ -49,7 +49,7 @@
 
 次の順番・説明で5枚を登録してください。
 
-1. `01-world-flow.png` — World Flow — 実世界地図上の8通貨Nodeと複数のCurrency Strength Flow
+1. `01-world-flow.png` — World Flow — 日本中心の実世界地図上に表示した8通貨Nodeと複数のCurrency Strength Flow
 2. `02-usdjpy.png` — USD/JPY Detail — 実データに基づくArrow方向と期間値・強弱通貨の詳細
 3. `03-jpy-focus.png` — JPY Focus — 円関連Arrowのhighlightと通貨別比較
 4. `04-strength-ranking.png` — Strength Ranking — 8通貨の決定論的Ranking
