@@ -25,7 +25,8 @@ async function openApp(context, label) {
   watchPage(page, label);
   const response = await page.goto(productionUrl, { waitUntil: "networkidle" });
   if (!response?.ok()) throw new Error(`${label}: production returned HTTP ${response?.status()}`);
-  await page.getByRole("heading", { name: "世界地図で、通貨の強弱を読む。" }).waitFor();
+  await page.getByRole("heading", { name: "世界通貨フロー" }).waitFor();
+  await page.getByRole("link", { name: /一次データ/ }).waitFor();
   return page;
 }
 
@@ -39,7 +40,7 @@ const desktop = await openApp(desktopContext, "desktop");
 await desktop.screenshot({ path: path.join(outputDirectory, "01-world-flow.png") });
 
 await desktop
-  .getByRole("button", { name: /^USD\/JPY \+1\.2%、JPYからUSD/ })
+  .getByRole("button", { name: /^USD\/JPY / })
   .press("Enter");
 await desktop.getByRole("heading", { name: "USD/JPY" }).waitFor();
 await desktop.screenshot({ path: path.join(outputDirectory, "02-usdjpy.png") });
@@ -54,16 +55,24 @@ await desktop.getByRole("heading", { name: "通貨強弱ランキング" }).firs
 await desktop.screenshot({ path: path.join(outputDirectory, "04-strength-ranking.png") });
 
 const mobileContext = await browser.newContext({
-  viewport: { width: 390, height: 844 },
+  viewport: { width: 844, height: 390 },
   colorScheme: "dark",
   deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
 });
 const mobile = await openApp(mobileContext, "mobile");
-await mobile.getByRole("heading", { name: "世界通貨フロー" }).scrollIntoViewIfNeeded();
 await mobile.screenshot({ path: path.join(outputDirectory, "05-mobile.png") });
-await mobile.getByRole("button", { name: "地図を操作" }).click();
+
+const portraitContext = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  colorScheme: "dark",
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+const portrait = await openApp(portraitContext, "portrait");
+await portrait.getByRole("button", { name: "地図を操作" }).click();
 
 const tabletContext = await browser.newContext({
   viewport: { width: 820, height: 1100 },
@@ -85,10 +94,15 @@ const qa = {
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
     }))),
-    mapTouchAction: await mobile
+    mapTouchAction: await portrait
       .getByRole("button", { name: "スクロールに戻る" })
       .evaluate((element) => getComputedStyle(element.parentElement).touchAction),
   },
+  portrait: await portrait.evaluate(() => ({
+    width: innerWidth,
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  })),
   tablet: await tablet.evaluate(() => ({
     width: innerWidth,
     clientWidth: document.documentElement.clientWidth,
@@ -98,6 +112,7 @@ const qa = {
 
 await desktopContext.close();
 await mobileContext.close();
+await portraitContext.close();
 await tabletContext.close();
 await browser.close();
 
@@ -105,6 +120,7 @@ console.log(JSON.stringify({ productionUrl, outputDirectory, qa, issues }, null,
 if (
   qa.desktop.scrollWidth > qa.desktop.clientWidth ||
   qa.mobile.scrollWidth > qa.mobile.clientWidth ||
+  qa.portrait.scrollWidth > qa.portrait.clientWidth ||
   qa.tablet.scrollWidth > qa.tablet.clientWidth
 ) {
   throw new Error("Horizontal overflow detected.");

@@ -3,8 +3,8 @@ import "server-only";
 import type { CurrencyPair, MarketDataProvider, PairQuote, Timeframe } from "./types";
 
 /**
- * Real providers implement this interface on the server only. API keys are read
- * from process.env and responses should be cached according to provider terms.
+ * Template for adding a future key-based provider. The production app currently
+ * uses EcbReferenceRateProvider, which is server-only and does not require a key.
  */
 export class UnconfiguredRealMarketDataProvider implements MarketDataProvider {
   readonly id = process.env.MARKET_DATA_PROVIDER || "unconfigured";

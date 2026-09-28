@@ -4,7 +4,7 @@ import { FLOW_THRESHOLDS, SUPPORTED_PAIRS, SUPPORTED_TIMEFRAMES } from "./config
 import { createDemoSnapshot } from "./demo";
 import {
   calculatePercentageChange, computeCurrencyStrength, filterFlows, getFlowWidth,
-  isFxMarketClosed, isStale, loadSnapshotWithFallback, quoteToFlow, shouldAnimate,
+  isDailyReferenceStale, isFxMarketClosed, isStale, loadSnapshotWithFallback, quoteToFlow, shouldAnimate,
 } from "./engine";
 import type { MarketDataProvider, PairQuote } from "./types";
 
@@ -90,6 +90,12 @@ describe("data status and fallback", () => {
     expect(isStale("2026-09-28T05:33:00.000Z", now, 90_000)).toBe(false);
     expect(isStale("2026-09-28T05:30:00.000Z", now, 90_000)).toBe(true);
     expect(isStale("invalid", now, 90_000)).toBe(true);
+  });
+
+  it("日次参照値は週末を遅延扱いせず、2営業日遅れでStaleにする", () => {
+    expect(isDailyReferenceStale("2026-09-25T00:00:00.000Z", new Date("2026-09-28T12:00:00Z"))).toBe(false);
+    expect(isDailyReferenceStale("2026-09-25T00:00:00.000Z", new Date("2026-09-29T12:00:00Z"))).toBe(true);
+    expect(isDailyReferenceStale("invalid", new Date("2026-09-29T12:00:00Z"))).toBe(true);
   });
 
   it("Market Closedを週末境界で判定する", () => {

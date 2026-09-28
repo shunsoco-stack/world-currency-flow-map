@@ -31,27 +31,29 @@
 - 11 Currency Pairの変化率から決定論的に算出するCurrency Strength
 - 「弱い通貨 → 強い通貨」へ流れるAnimated Arrow
 - 変化率に連動するArrow thickness / animation speed
-- 6 Timeframe、3 Demo Scenario、4時点Timeline / Play Mode
+- ECB公式日次参照レートによる実データ初期表示（1日 / 1週間）
+- 6 Timeframe、3 Demo Scenario、4時点Timeline / Play Mode（短時間足とTimelineはDemo）
 - Currency Filter、JPY Focus、Pair Detail、Strength Ranking、Pair一覧
 - Zoom / Pan / Reset、Light / Dark / System、Reduced Motion
-- MarketDataProvider抽象化、Stale / Market Closed / API fallback engine
+- MarketDataProvider抽象化、server-side cache、Stale / Market Closed / API fallback engine
 - Manifest / icon / standaloneのPWA基本対応
+- 起動直後のMap-first表示、横画面最適化、PWA landscape指定
 
 次の注意書きを必ず表示してください。
 
-> 固定Demo Dataを使用しています。Arrowは実際の国際資金移動量ではなく、為替レート変化率から算出した相対的な通貨強弱です。実データProviderとRealtime配信は未接続で、投資助言を目的としたアプリではありません。
+> 初期表示はEuropean Central Bank（ECB）の日次参照レートを使用しています。Realtime / Streamingではありません。Arrowは実際の国際資金移動量ではなく、為替レート変化率から算出した相対的な通貨強弱であり、投資助言を目的としたアプリではありません。
 
-推奨tagsは`Next.js 16`、`React 19`、`TypeScript`、`D3 Geo`、`Vitest`、`Vercel`です。推奨badgesは`Deterministic Strength`、`Natural Earth Map`、`Demo Data`、`Real Provider Ready`です。
+推奨tagsは`Next.js 16`、`React 19`、`TypeScript`、`D3 Geo`、`Vitest`、`Vercel`です。推奨badgesは`ECB Real Data`、`Deterministic Strength`、`Natural Earth Map`、`Landscape PWA`です。
 
 ## Gallery
 
 次の順番・説明で5枚を登録してください。
 
 1. `01-world-flow.png` — World Flow — 実世界地図上の8通貨Nodeと複数のCurrency Strength Flow
-2. `02-usdjpy.png` — USD/JPY Detail — JPY → USD ArrowとOHLC・強弱通貨の詳細
+2. `02-usdjpy.png` — USD/JPY Detail — 実データに基づくArrow方向と期間値・強弱通貨の詳細
 3. `03-jpy-focus.png` — JPY Focus — 円関連Arrowのhighlightと通貨別比較
 4. `04-strength-ranking.png` — Strength Ranking — 8通貨の決定論的Ranking
-5. `05-mobile.png` — Mobile — 390px幅のResponsive表示
+5. `05-mobile.png` — Mobile Landscape — 844×390の横画面Responsive表示
 
 ## URL
 
@@ -61,4 +63,4 @@
 
 ## QA
 
-変更後にポートフォリオのlint / typecheck / test / buildを実行してください。Desktop / MobileでCardとDetail/Galleryを確認し、5枚すべてがローカル相対pathから表示されること、Main thumbnailが世界地図画面であること、Production/GitHub CTAが正しいことを確認してください。元の開発プロンプトにだけ存在するReal Mode、経済イベントLayer、将来Assetを実装済みとして記載しないでください。
+変更後にポートフォリオのlint / typecheck / test / buildを実行してください。Desktop / MobileでCardとDetail/Galleryを確認し、5枚すべてがローカル相対pathから表示されること、Main thumbnailが世界地図画面であること、Production/GitHub CTAが正しいことを確認してください。ECB実データは1日 / 1週間のみで、Realtime、経済イベントLayer、将来Assetを実装済みとして記載しないでください。

@@ -2,8 +2,8 @@
 
 import {
   ArrowDown, ArrowRight, ArrowUp, BarChart3, ChevronRight, CircleHelp,
-  Clock3, Gauge, Globe2, Info, ListFilter, Maximize2, Moon, Pause, Play,
-  ShieldCheck, SkipBack, SkipForward, SlidersHorizontal, Sun,
+  Clock3, ExternalLink, Gauge, Globe2, Info, ListFilter, Maximize2, Moon, Pause, Play,
+  RefreshCw, RotateCw, ShieldCheck, SkipBack, SkipForward, SlidersHorizontal, Sun,
   X, Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -11,16 +11,18 @@ import { useEffect, useMemo, useState } from "react";
 import { WorldMap } from "./world-map";
 import { CURRENCY_META, SUPPORTED_TIMEFRAMES, TIMELINE_LABELS } from "@/lib/market-data/config";
 import { createDemoSnapshot } from "@/lib/market-data/demo";
+import { ECB_REAL_TIMEFRAMES, ECB_SOURCE_URL } from "@/lib/market-data/ecb";
 import {
   computeCurrencyStrength, createMarketSummary, getCurrencyComparisons,
-  isFxMarketClosed, quoteToFlow, shouldAnimate,
+  isDailyReferenceStale, isFxMarketClosed, quoteToFlow, shouldAnimate,
 } from "@/lib/market-data/engine";
-import type { CurrencyCode, DemoScenarioId, Timeframe } from "@/lib/market-data/types";
+import type { CurrencyCode, DemoScenarioId, MarketSnapshot, Timeframe } from "@/lib/market-data/types";
 import styles from "./currency-flow-app.module.css";
 
 type ViewMode = "flow" | "ranking" | "pairs";
 type ThemeMode = "light" | "dark" | "system";
 type SortMode = "change" | "strength" | "currency";
+type DataChoice = "real" | DemoScenarioId;
 
 const scenarioOptions: { id: DemoScenarioId; label: string; note: string }[] = [
   { id: "usd-strong", label: "ドル全面高", note: "USD強・JPY弱" },
@@ -54,10 +56,26 @@ function DirectionIcon({ score }: { score: number }) {
 
 function scoreLabel(score: number) { return `${score > 0 ? "+" : ""}${score}`; }
 
-export function CurrencyFlowApp() {
+function observationDateLabel(updatedAt: string) {
+  const date = new Date(updatedAt);
+  if (!Number.isFinite(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(date);
+}
+
+function fetchedTimeLabel(fetchedAt?: string) {
+  const date = fetchedAt ? new Date(fetchedAt) : null;
+  if (!date || !Number.isFinite(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(date);
+}
+
+export function CurrencyFlowApp({ initialSnapshot }: { initialSnapshot: MarketSnapshot }) {
   const [viewMode, setViewMode] = useState<ViewMode>("flow");
   const [scenario, setScenario] = useState<DemoScenarioId>("usd-strong");
-  const [timeframe, setTimeframe] = useState<Timeframe>("1d");
+  const [dataChoice, setDataChoice] = useState<DataChoice>("real");
+  const [realSnapshot, setRealSnapshot] = useState<MarketSnapshot | null>(initialSnapshot.mode === "real" ? initialSnapshot : null);
+  const [timeframe, setTimeframe] = useState<Timeframe>(initialSnapshot.timeframe);
+  const [dataError, setDataError] = useState(initialSnapshot.fallbackReason ?? "");
+  const [isLoading, setIsLoading] = useState(false);
   const [timelineIndex, setTimelineIndex] = useState(3);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -70,7 +88,12 @@ export function CurrencyFlowApp() {
   const [userPaused, setUserPaused] = useState(false);
   const [pairSort, setPairSort] = useState<SortMode>("change");
 
-  const snapshot = useMemo(() => createDemoSnapshot(scenario, timeframe, timelineIndex), [scenario, timeframe, timelineIndex]);
+  const fallbackSnapshot = useMemo(
+    () => ({ ...createDemoSnapshot(scenario, timeframe, timelineIndex), fallbackReason: dataError || undefined }),
+    [scenario, timeframe, timelineIndex, dataError],
+  );
+  const snapshot = dataChoice === "real" ? (realSnapshot ?? fallbackSnapshot) : fallbackSnapshot;
+  const isReal = dataChoice === "real" && snapshot.mode === "real";
   const strengths = useMemo(() => computeCurrencyStrength(snapshot.quotes), [snapshot.quotes]);
   const flows = useMemo(() => snapshot.quotes.map((quote) => quoteToFlow(quote)).sort((a, b) => b.magnitude - a.magnitude), [snapshot.quotes]);
   const selectedFlow = useMemo(() => flows.find((flow) => flow.pair === selectedPair) ?? null, [flows, selectedPair]);
@@ -80,7 +103,8 @@ export function CurrencyFlowApp() {
   const biggest = flows[0];
   const summary = useMemo(() => createMarketSummary(strengths), [strengths]);
   const animate = shouldAnimate({ prefersReducedMotion, pageVisible, userPaused });
-  const marketClosed = isFxMarketClosed(new Date(snapshot.updatedAt));
+  const marketClosed = isFxMarketClosed(new Date());
+  const stale = isReal && isDailyReferenceStale(snapshot.updatedAt);
 
   const sortedQuotes = useMemo(() => {
     const rows = [...snapshot.quotes];
@@ -112,18 +136,52 @@ export function CurrencyFlowApp() {
   }, [theme]);
 
   useEffect(() => {
-    if (!timelinePlaying || prefersReducedMotion) return;
+    if (!timelinePlaying || prefersReducedMotion || dataChoice === "real") return;
     const timer = window.setTimeout(() => {
       if (timelineIndex >= TIMELINE_LABELS.length - 1) setTimelinePlaying(false);
       else setTimelineIndex(timelineIndex + 1);
     }, 1250 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [timelineIndex, timelinePlaying, playbackSpeed, prefersReducedMotion]);
+  }, [timelineIndex, timelinePlaying, playbackSpeed, prefersReducedMotion, dataChoice]);
 
-  function changeScenario(next: DemoScenarioId) {
+  async function loadRealSnapshot(nextTimeframe: "1d" | "1w") {
+    setIsLoading(true);
+    setDataError("");
+    try {
+      const response = await fetch(`/api/market-data?timeframe=${nextTimeframe}`, { cache: "no-store" });
+      const payload = await response.json() as MarketSnapshot | { error?: string };
+      if (!response.ok || !("quotes" in payload)) throw new Error("error" in payload ? payload.error : "市場データを取得できません");
+      setRealSnapshot(payload);
+      setTimeframe(nextTimeframe);
+      setSelectedPair(null);
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : "市場データを取得できません");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function changeDataChoice(next: DataChoice) {
+    setDataChoice(next);
+    setTimelinePlaying(false);
+    setSelectedPair(null);
+    if (next === "real") {
+      const nextTimeframe = ECB_REAL_TIMEFRAMES.includes(timeframe as "1d" | "1w") ? timeframe as "1d" | "1w" : "1d";
+      setTimeframe(nextTimeframe);
+      if (!realSnapshot || realSnapshot.timeframe !== nextTimeframe) void loadRealSnapshot(nextTimeframe);
+      return;
+    }
     setScenario(next);
     setTimelineIndex(3);
-    setTimelinePlaying(false);
+  }
+
+  function changeTimeframe(next: Timeframe) {
+    if (dataChoice === "real") {
+      if (!ECB_REAL_TIMEFRAMES.includes(next as "1d" | "1w")) return;
+      void loadRealSnapshot(next as "1d" | "1w");
+      return;
+    }
+    setTimeframe(next);
     setSelectedPair(null);
   }
 
@@ -140,8 +198,7 @@ export function CurrencyFlowApp() {
           <span><strong>世界通貨フローマップ</strong><small>CURRENCY STRENGTH VISUALIZATION</small></span>
         </a>
         <div className={styles.headerStatus}>
-          <span className={styles.demoPill}><i /> DEMO</span>
-          <span>実相場ではありません</span>
+          {isReal ? <><span className={styles.realPill}><i /> ECB DATA</span><span>日次参照値 · 約16:00 CET更新</span></> : <><span className={styles.demoPill}><i /> DEMO</span><span>{dataError ? "実データ取得失敗 · Demo表示" : "実相場ではありません"}</span></>}
         </div>
         <div className={styles.headerActions}>
           <button type="button" onClick={focusJpy} className={styles.jpyButton}>¥ 円を見る</button>
@@ -155,10 +212,7 @@ export function CurrencyFlowApp() {
       </header>
 
       <div className={styles.page} id="main-content">
-        <section className={styles.intro}>
-          <div><span className={styles.eyebrow}><Globe2 size={14} /> WORLD CURRENCY STRENGTH</span><h1>世界地図で、通貨の強弱を読む。</h1><p>数字だけでは見えにくい「弱い通貨 → 強い通貨」の方向を、地図上の動きとして可視化します。</p></div>
-          <div className={styles.dataBadge}><Info size={15} /><span>矢印は実際の国際資金移動額ではなく、<strong>為替レートから算出した相対的な通貨強弱</strong>を表しています。</span></div>
-        </section>
+        <div className={styles.orientationHint}><RotateCw size={14} /><span>横向きにすると世界地図をより大きく表示できます</span></div>
 
         <section className={styles.controlDeck} aria-label="表示設定">
           <div className={styles.segmentedControl} aria-label="表示モード">
@@ -167,30 +221,27 @@ export function CurrencyFlowApp() {
             <button type="button" onClick={() => setViewMode("pairs")} aria-pressed={viewMode === "pairs"}><ListFilter size={15} />Pair一覧</button>
           </div>
           <div className={styles.timeframeControl} aria-label="時間足">
-            {SUPPORTED_TIMEFRAMES.map((item) => <button type="button" key={item} onClick={() => { setTimeframe(item); setSelectedPair(null); }} aria-pressed={timeframe === item}>{timeframeLabels[item]}</button>)}
+            {SUPPORTED_TIMEFRAMES.map((item) => {
+              const unavailable = dataChoice === "real" && !ECB_REAL_TIMEFRAMES.includes(item as "1d" | "1w");
+              return <button type="button" key={item} onClick={() => changeTimeframe(item)} aria-pressed={timeframe === item} disabled={unavailable} title={unavailable ? "ECB日次参照レートでは利用できません" : undefined}>{timeframeLabels[item]}</button>;
+            })}
           </div>
-          <label className={styles.scenarioSelect}><span>デモシナリオ</span><select value={scenario} onChange={(event) => changeScenario(event.target.value as DemoScenarioId)}>{scenarioOptions.map((item) => <option key={item.id} value={item.id}>{item.label} — {item.note}</option>)}</select></label>
-        </section>
-
-        <section className={styles.summaryGrid} aria-label="マーケット概要">
-          <article><span>最強通貨</span><div><strong>{strongest.currency}</strong><em className={styles.positive}><ArrowUp size={16} />{scoreLabel(strongest.score)}</em></div><small>{CURRENCY_META[strongest.currency].region}</small></article>
-          <article><span>最弱通貨</span><div><strong>{weakest.currency}</strong><em className={styles.negative}><ArrowDown size={16} />{scoreLabel(weakest.score)}</em></div><small>{CURRENCY_META[weakest.currency].region}</small></article>
-          <article><span>最大変動Pair</span><div><strong>{biggest.pair}</strong><em className={biggest.changePercent >= 0 ? styles.positive : styles.negative}>{biggest.changePercent > 0 ? "+" : ""}{biggest.changePercent.toFixed(2)}%</em></div><small>{biggest.from} → {biggest.to}</small></article>
-          <article><span>最終更新</span><div><strong>{snapshot.timelineLabel}</strong><em className={marketClosed ? styles.warning : styles.neutral}><Clock3 size={14} />{marketClosed ? "市場休場" : "デモ基準"}</em></div><small>2026/09/28 JST</small></article>
+          <label className={styles.scenarioSelect}><span>データソース</span><select value={dataChoice} onChange={(event) => changeDataChoice(event.target.value as DataChoice)}><option value="real">ECB日次参照レート（実データ）</option>{scenarioOptions.map((item) => <option key={item.id} value={item.id}>Demo：{item.label} — {item.note}</option>)}</select></label>
         </section>
 
         {viewMode === "flow" ? (
           <section className={styles.flowWorkspace}>
             <div className={styles.mapCard}>
               <div className={styles.mapCardHeader}>
-                <div><span className={styles.sectionLabel}>CURRENCY STRENGTH FLOW</span><h2>世界通貨フロー</h2></div>
+                <div><span className={styles.sectionLabel}>{isReal ? "ECB REFERENCE RATE FLOW" : "CURRENCY STRENGTH FLOW · DEMO"}</span><h1>世界通貨フロー</h1><p className={styles.mapSubline}>弱い通貨 → 強い通貨。矢印は実資金移動額ではなく、為替変化率から算出した相対強弱です。</p></div>
                 <div className={styles.mapHeaderActions}>
                   {selectedCurrency ? <button type="button" className={styles.filterChip} onClick={() => setSelectedCurrency(null)}>{selectedCurrency} 関連のみ <X size={13} /></button> : null}
+                  {dataChoice === "real" ? <button type="button" onClick={() => void loadRealSnapshot((ECB_REAL_TIMEFRAMES.includes(timeframe as "1d" | "1w") ? timeframe : "1d") as "1d" | "1w")} className={styles.animationButton} disabled={isLoading}><RefreshCw size={14} className={isLoading ? styles.spinning : ""} />{isLoading ? "取得中" : "再取得"}</button> : null}
                   <button type="button" onClick={() => setUserPaused((value) => !value)} className={styles.animationButton}>{animate ? <Pause size={15} /> : <Play size={15} />}{animate ? "動きを停止" : "動きを再生"}</button>
                 </div>
               </div>
               <WorldMap flows={flows} strengths={strengths} selectedCurrency={selectedCurrency} selectedPair={selectedPair} animate={animate} onCurrencySelect={setSelectedCurrency} onFlowSelect={(flow) => setSelectedPair(flow.pair)} />
-              <div className={styles.timelinePanel}>
+              {isReal ? <div className={styles.realDataBand}><span><ShieldCheck size={14} /> European Central Bank · 最新公表日 {observationDateLabel(snapshot.updatedAt)}</span><a href={snapshot.sourceUrl ?? ECB_SOURCE_URL} target="_blank" rel="noreferrer">一次データ <ExternalLink size={12} /></a></div> : <div className={styles.timelinePanel}>
                 <div className={styles.timelineTitle}><span><Clock3 size={15} /> Timeline / Play Mode</span><small>デモ内の4時点を再生</small></div>
                 <div className={styles.playControls}>
                   <button type="button" onClick={() => { setTimelinePlaying(false); setTimelineIndex(Math.max(0, timelineIndex - 1)); }} aria-label="前の時点"><SkipBack size={16} /></button>
@@ -199,7 +250,7 @@ export function CurrencyFlowApp() {
                 </div>
                 <div className={styles.timelineTrack}>{TIMELINE_LABELS.map((label, index) => <button type="button" key={label} onClick={() => { setTimelineIndex(index); setTimelinePlaying(false); }} className={index <= timelineIndex ? styles.timelinePassed : ""} aria-current={index === timelineIndex ? "step" : undefined}><i /><span>{label}</span></button>)}</div>
                 <button type="button" className={styles.speedButton} onClick={() => setPlaybackSpeed((speed) => speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1)}>{playbackSpeed}×</button>
-              </div>
+              </div>}
             </div>
 
             <aside className={styles.inspector}>
@@ -209,9 +260,9 @@ export function CurrencyFlowApp() {
                   <div className={styles.directionHero}><div><span>{selectedFlow.from}</span><small>弱い</small></div><div><strong>{selectedFlow.from} → {selectedFlow.to}</strong><i /></div><div><span>{selectedFlow.to}</span><small>強い</small></div></div>
                   <dl className={styles.detailGrid}>
                     <div><dt>現在値</dt><dd>{selectedFlow.quote.current}</dd></div><div><dt>変化率</dt><dd className={selectedFlow.changePercent >= 0 ? styles.positive : styles.negative}>{selectedFlow.changePercent > 0 ? "+" : ""}{selectedFlow.changePercent.toFixed(2)}%</dd></div>
-                    <div><dt>始値</dt><dd>{selectedFlow.quote.open}</dd></div><div><dt>高値</dt><dd>{selectedFlow.quote.high}</dd></div><div><dt>安値</dt><dd>{selectedFlow.quote.low}</dd></div><div><dt>値動き</dt><dd>{selectedFlow.width === "thick" ? "大" : selectedFlow.width === "medium" ? "中" : "小"}</dd></div>
+                    <div><dt>{isReal ? "比較基準値" : "始値"}</dt><dd>{selectedFlow.quote.open}</dd></div><div><dt>{isReal ? "期間高値" : "高値"}</dt><dd>{selectedFlow.quote.high}</dd></div><div><dt>{isReal ? "期間安値" : "安値"}</dt><dd>{selectedFlow.quote.low}</dd></div><div><dt>値動き</dt><dd>{selectedFlow.width === "thick" ? "大" : selectedFlow.width === "medium" ? "中" : "小"}</dd></div>
                   </dl>
-                  <div className={styles.detailUpdated}><Clock3 size={13} />最終更新 {snapshot.timelineLabel}（デモ基準）</div>
+                  <div className={styles.detailUpdated}><Clock3 size={13} />{isReal ? `ECB公表日 ${observationDateLabel(snapshot.updatedAt)} · ${timeframeLabels[snapshot.timeframe]}比較` : `最終更新 ${snapshot.timelineLabel}（デモ基準）`}</div>
                 </article>
               ) : selectedCurrency ? (
                 <article className={styles.focusCard} data-testid="currency-focus">
@@ -222,6 +273,7 @@ export function CurrencyFlowApp() {
               ) : (
                 <article className={styles.nowCard}>
                   <span className={styles.sectionLabel}><Zap size={13} /> NOW</span><h2>今、何が起きている？</h2><p>{summary}</p><div className={styles.evidence}><ShieldCheck size={14} /><span>11 Pairの変化率を根拠に、決定論的テンプレートで生成</span></div>
+                  {dataChoice === "real" && dataError ? <div className={styles.dataError}><Info size={13} />{dataError}</div> : null}
                 </article>
               )}
 
@@ -233,6 +285,13 @@ export function CurrencyFlowApp() {
           </section>
         ) : null}
 
+        <section className={styles.summaryGrid} aria-label="マーケット概要">
+          <article><span>最強通貨</span><div><strong>{strongest.currency}</strong><em className={styles.positive}><ArrowUp size={16} />{scoreLabel(strongest.score)}</em></div><small>{CURRENCY_META[strongest.currency].region}</small></article>
+          <article><span>最弱通貨</span><div><strong>{weakest.currency}</strong><em className={styles.negative}><ArrowDown size={16} />{scoreLabel(weakest.score)}</em></div><small>{CURRENCY_META[weakest.currency].region}</small></article>
+          <article><span>最大変動Pair</span><div><strong>{biggest.pair}</strong><em className={biggest.changePercent >= 0 ? styles.positive : styles.negative}>{biggest.changePercent > 0 ? "+" : ""}{biggest.changePercent.toFixed(2)}%</em></div><small>{biggest.from} → {biggest.to}</small></article>
+          <article><span>最終更新</span><div><strong>{isReal ? observationDateLabel(snapshot.updatedAt) : snapshot.timelineLabel}</strong><em className={stale || marketClosed ? styles.warning : styles.neutral}><Clock3 size={14} />{isReal ? stale ? "データ更新遅延" : marketClosed ? "市場休場" : "最新公表値" : "デモ基準"}</em></div><small>{isReal ? `ECB日次 · 取得 ${fetchedTimeLabel(snapshot.fetchedAt)} JST` : "固定Demo Data"}</small></article>
+        </section>
+
         {viewMode === "ranking" ? (
           <section className={styles.fullPanel} data-testid="ranking-view">
             <div className={styles.fullPanelHeader}><div><span className={styles.sectionLabel}>DETERMINISTIC INDEX</span><h2>通貨強弱ランキング</h2><p>各通貨が関係するPairの変化率をBaseは加算、Quoteは減算し、平均値を最大絶対値で−100〜+100に正規化しています。</p></div><Gauge size={30} /></div>
@@ -242,8 +301,8 @@ export function CurrencyFlowApp() {
 
         {viewMode === "pairs" ? (
           <section className={styles.fullPanel} data-testid="pairs-view">
-            <div className={styles.fullPanelHeader}><div><span className={styles.sectionLabel}>11 SUPPORTED PAIRS</span><h2>Pair一覧</h2><p>すべてデモデータです。実データProvider接続時は対応可能なPair・Timeframeだけを表示します。</p></div><div className={styles.sortControl}><span>並び順</span>{(["change", "strength", "currency"] as SortMode[]).map((item) => <button type="button" key={item} onClick={() => setPairSort(item)} aria-pressed={pairSort === item}>{item === "change" ? "変化率" : item === "strength" ? "Strength" : "通貨名"}</button>)}</div></div>
-            <div className={styles.pairTableWrap}><table className={styles.pairTable}><thead><tr><th>Pair</th><th>現在値</th><th>変化率</th><th>Arrow方向</th><th>値動き</th><th>最終更新</th><th /></tr></thead><tbody>{sortedQuotes.map((quote) => { const flow = quoteToFlow(quote); return <tr key={quote.pair}><td><strong>{quote.pair}</strong></td><td>{quote.current}</td><td className={quote.changePercent >= 0 ? styles.positive : styles.negative}>{quote.changePercent > 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%</td><td>{flow.from} <ArrowRight size={14} /> {flow.to}</td><td><span className={`${styles.magnitudeBadge} ${styles[flow.width]}`}>{flow.width === "thick" ? "大" : flow.width === "medium" ? "中" : "小"}</span></td><td>{snapshot.timelineLabel}</td><td><button type="button" onClick={() => { setSelectedPair(quote.pair); setViewMode("flow"); }}>地図で見る <ChevronRight size={14} /></button></td></tr>; })}</tbody></table></div>
+            <div className={styles.fullPanelHeader}><div><span className={styles.sectionLabel}>11 SUPPORTED PAIRS</span><h2>Pair一覧</h2><p>{isReal ? `ECB日次参照レートの実データです。${timeframeLabels[snapshot.timeframe]}の公表値変化を表示しています。` : "明示されたDemoデータです。実相場ではありません。"}</p></div><div className={styles.sortControl}><span>並び順</span>{(["change", "strength", "currency"] as SortMode[]).map((item) => <button type="button" key={item} onClick={() => setPairSort(item)} aria-pressed={pairSort === item}>{item === "change" ? "変化率" : item === "strength" ? "Strength" : "通貨名"}</button>)}</div></div>
+            <div className={styles.pairTableWrap}><table className={styles.pairTable}><thead><tr><th>Pair</th><th>現在値</th><th>変化率</th><th>Arrow方向</th><th>値動き</th><th>最終更新</th><th /></tr></thead><tbody>{sortedQuotes.map((quote) => { const flow = quoteToFlow(quote); return <tr key={quote.pair}><td><strong>{quote.pair}</strong></td><td>{quote.current}</td><td className={quote.changePercent >= 0 ? styles.positive : styles.negative}>{quote.changePercent > 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%</td><td>{flow.from} <ArrowRight size={14} /> {flow.to}</td><td><span className={`${styles.magnitudeBadge} ${styles[flow.width]}`}>{flow.width === "thick" ? "大" : flow.width === "medium" ? "中" : "小"}</span></td><td>{isReal ? observationDateLabel(snapshot.updatedAt) : snapshot.timelineLabel}</td><td><button type="button" onClick={() => { setSelectedPair(quote.pair); setViewMode("flow"); }}>地図で見る <ChevronRight size={14} /></button></td></tr>; })}</tbody></table></div>
           </section>
         ) : null}
 

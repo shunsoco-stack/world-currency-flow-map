@@ -101,6 +101,23 @@ export function isStale(updatedAt: string, now = new Date(), staleAfterMs = 90_0
   return !Number.isFinite(updated) || now.getTime() - updated > staleAfterMs;
 }
 
+export function isDailyReferenceStale(updatedAt: string, now = new Date()): boolean {
+  const observed = new Date(`${updatedAt.slice(0, 10)}T00:00:00.000Z`);
+  if (!Number.isFinite(observed.getTime())) return true;
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (observed >= today) return false;
+
+  let businessDays = 0;
+  const cursor = new Date(observed);
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  while (cursor <= today) {
+    const day = cursor.getUTCDay();
+    if (day !== 0 && day !== 6) businessDays += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return businessDays > 1;
+}
+
 export function isFxMarketClosed(date = new Date()): boolean {
   const day = date.getUTCDay();
   const hour = date.getUTCHours();

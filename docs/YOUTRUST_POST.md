@@ -10,15 +10,15 @@
 直感的に確認できるようにしました。
 
 【主な機能】
-・11のCurrency Pairから8通貨のStrengthを決定論的に算出
+・ECB公式日次参照レートから11のCurrency Pairを生成し、8通貨のStrengthを決定論的に算出
 ・弱い通貨から強い通貨へ流れるAnimated Arrowと、JPY Focus / Currency Filter
-・6つのTimeframe、3つのDemo Scenario、Ranking、Pair Detail、Timeline再生
+・起動直後に世界地図を表示する横画面UI、1日 / 1週間の実データ切替、Ranking、Pair Detail
 
 【開発について】
 AIを活用しながら、企画・設計・開発・公開まで行っています。
 実際の仕事や日常で「こんなのあったら便利」を形にすることを意識しています。
 
-※現在は固定Demo Dataです。矢印は実際の資金移動量ではなく、為替レート変化率から算出した相対的な通貨強弱を表しています。投資助言を目的としたアプリではありません。
+※実データはECBの日次参照レートで、Realtime配信ではありません。矢印は実際の資金移動量ではなく、為替レート変化率から算出した相対的な通貨強弱を表しています。投資助言を目的としたアプリではありません。
 
 🔗 https://world-currency-flow-map.vercel.app
 

@@ -22,9 +22,11 @@ export interface PairQuote {
 export interface MarketSnapshot {
   provider: string;
   mode: "demo" | "real";
-  scenario: DemoScenarioId;
+  scenario?: DemoScenarioId;
   timeframe: Timeframe;
   updatedAt: string;
+  fetchedAt?: string;
+  sourceUrl?: string;
   quotes: PairQuote[];
   timelineIndex: number;
   timelineLabel: string;
