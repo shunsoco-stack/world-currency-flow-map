@@ -43,10 +43,10 @@ Strength ScoreはAI生成ではなく、選択TimeframeのPair変化率から決
 | 項目 | ルール |
 | --- | --- |
 | Direction | 弱い通貨 → 強い通貨 |
-| 細い | `|変化率| ≤ 0.25%` / 2.25px |
-| 中 | `0.25% < |変化率| ≤ 0.75%` / 4.5px |
-| 太い | `|変化率| > 0.75%` / 7.5px |
-| Speed | `max(1.4, 4.4 - min(|変化率|, 1.5) × 1.8)`秒 |
+| 細い | `abs(変化率) ≤ 0.25%` / 2.25px |
+| 中 | `0.25% < abs(変化率) ≤ 0.75%` / 4.5px |
+| 太い | `abs(変化率) > 0.75%` / 7.5px |
+| Speed | `max(1.4, 4.4 - min(abs(変化率), 1.5) × 1.8)`秒 |
 
 Thresholdとstroke widthは[`src/lib/market-data/config.ts`](src/lib/market-data/config.ts)で変更できます。
 
