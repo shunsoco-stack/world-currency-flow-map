@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { LegalFooter } from "@/components/legal-footer";
 
 export const metadata: Metadata = {
   title: "世界通貨フローマップ",
@@ -18,5 +19,8 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ja" suppressHydrationWarning><body>{children}</body></html>;
+  return <html lang="ja" suppressHydrationWarning><body>
+        {children}
+        <LegalFooter />
+      </body></html>;
 }

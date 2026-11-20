@@ -1,6 +1,7 @@
 import { CurrencyFlowApp } from "@/components/currency-flow-app";
 import { createDemoSnapshot } from "@/lib/market-data/demo";
 import { EcbReferenceRateProvider } from "@/lib/market-data/ecb-provider";
+import { NinjaAdMaxSlot } from "@/components/ninja-admax-slot";
 
 export const revalidate = 3600;
 
@@ -14,5 +15,10 @@ export default async function Page() {
       fallbackReason: error instanceof Error ? error.message : "市場データを取得できません",
     };
   }
-  return <CurrencyFlowApp initialSnapshot={initialSnapshot} />;
+  return (
+    <>
+      <CurrencyFlowApp initialSnapshot={initialSnapshot} />
+      <NinjaAdMaxSlot />
+    </>
+  );
 }
